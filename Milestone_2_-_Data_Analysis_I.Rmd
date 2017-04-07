@@ -1,8 +1,10 @@
 ---
 title: "Recommended Systems Data Preparation"
-author: "Somua-Gyimah, Godfred   | Ballamudi, Bharath Chowdary    | Gottapu, Ram Deepak "
+author: 'Somua-Gyimah, Godfred   | Ballamudi, Bharath Chowdary    | Gottapu, Ram Deepak '
 date: "March 5, 2017"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -148,19 +150,18 @@ tail(user_info)
 For our model, user location is irrelevant so we will drop the 'Zip Code' variable and use only Gender and Age. We will also drop the 'Occupation' variable because it is not comprehensive enough.  
 
 ```{r}
-user_info$Occupation = NULL
 user_info$Zip_Code = NULL
+user_info$Occupation = NULL
+df$Gender = 0
+df$age = 0
 # If the user ids in 'df' and 'user_info' match, create or update the values in df$Age, df$Gender and df$Occupation.
-for (i in 1:nrow(df)){
-  for (j in 1:nrow(user_info)){
-    if(df[i,1]==user_info[j,1]){
-      next
-    }
-      df$Age[i]        <- user_info$Age[j]
-      df$Gender[i]     <- user_info$New_Gender[j]
-  }
-  
+ptm <- proc.time()
+for (i in 1:1000)
+{
+  df[i,4]=user_info[i,2]
+  df[i,5]=user_info[i,3]
 }
+proc.time() - ptm
   
 ```
 
@@ -185,200 +186,314 @@ head(movie_info)
 tail(movie_info)
 ```
 
-Next, we will update df with each movie's genre information.
-```{r}
-# If the movie ids in 'df' and 'movie_info' match, create or update the values in df$All_Genres.
-for (i in 1:nrow(df)){
-  for (k in 1:nrow(movie_info)){
-    if(df[i,2]==movie_info[k,1]){
-      next
-    }
-      df$All_Genres[i]        <- movie_info$All_Genres[k]
 
+### Creating dummy variables for the 'Genre' feature
+```{r}
+count = 1;
+genres = c('Action','Adventure','Animation','Children\'s','Comedy','Crime','Documentary','Drama','Fantasy','Film-Noir','Horror','Musical','Mystery','Romance','Sci-Fi','Thriller','War','Western')
+noOfMovies = nrow(movie_info)
+noOfcols = ncol(movie_info)
+for (i in genres)
+{
+  for (j in 3:noOfcols)
+  {
+    movie_info[[j]] = gsub(i,as.character(count),movie_info[[j]])
   }
-  
+  count = count+1;
 }
-  
+
+R = data.frame(matrix(0,ncol = 18 , nrow = noOfMovies))
+for (i in 1:noOfMovies)
+{
+  for (j in 3:noOfcols)
+  {
+    if (!is.na(as.numeric(movie_info[i,j])))
+    {
+      R[i,as.numeric(movie_info[i,j])]=1
+    }
+    
+  }
+}
+colnames(R)=genres
+movie_data = movie_info[,1:2]
+movie_data = cbind(movie_data,R)
 ```
-
-
-We will now move the target variable (Rating) to the first column for convenience. 
+### Take a look at new movie data
 
 ```{r}
-library(dplyr)
-full_data <- df %>%
-  select(Ratings, User_ID, Movie_ID, Age, All_Genres)
+head(movie_data)
 ```
+### generate matrix of users vs movies
 
-Now, we will view our new data set
+The matrix has rating values given by each user for each movie. The columns are users and rows are movies
+
 ```{r}
-head(full_data)
-tail(full_data)
+# We wrote the file into a csv to avoid running the code each time
+m = read.csv('uservsmov.csv',stringsAsFactors = T)
+# Uncomment to run this code
+# m = data.frame(matrix(0,ncol = nrow(user_info), nrow = noOfMovies))
+# for (i in 1:nrow(rating_info))
+# {
+#   m[rating_info$Movie_ID[i],rating_info$User_ID[i]]=rating_info$Ratings[i]
+# }
+# 
+# for (i in 1:nrow(rate))
+# {
+#   rate[i,5]=user_info[rate[i,1],3]
+# }
 ```
 
-We will now Save our full dataset into a csv file
+
+## DATA EXPLORATION
+
+Since our data set is so large, we had a lot of problems uploading all of it for analysis. Therefore, we will perform exploratory analysis on a sample 100,000 observations. 
+
 ```{r}
-write.csv(full_data, file = "full_data.csv")
+library(ggplot2)
+library(lattice)
 ```
-
-
-# Creating dummy variables for the 'All_Genres' feature
-
-Next, we will create dummy variables for all the following different genres in the 'All_Genres' variable:
-
-                	* Action
-                	* Adventure
-                	* Animation
-                	* Children's
-                	* Comedy
-                	* Crime
-                	* Documentary
-                	* Drama
-                	* Fantasy
-                	* Film-Noir
-                	* Horror
-                	* Musical
-                	* Mystery
-                	* Romance
-                	* Sci-Fi
-                	* Thriller
-                	* War
-                	* Western
 
 
 ```{r}
-# Assign 1 to all instances where a particular genre shows in the 'All_Genres'
-full_data[grep("Action", full_data$All_Genres),"Action_gen"] <- 1
-# Replace missing values with 0
-full_data$Action_gen[is.na(full_data$Action_gen)] <- 0
 
-# Repeat for all other genres
-full_data[grep("Adventure", full_data$All_Genres),"Adventure_gen"] <- 1
-full_data$Adventure_gen[is.na(full_data$Adventure_gen)] <- 0
 
-full_data[grep("Animation", full_data$All_Genres),"Animation_gen"] <- 1
-full_data$Animation[is.na(full_data$Animation)] <- 0
+df <- read.csv("rate.csv")
 
-full_data[grep("Children's", full_data$All_Genres),"Children_gen"] <- 1
-full_data$Children_gen[is.na(full_data$Children_gen)] <- 0
-
-full_data[grep("Comedy", full_data$All_Genres),"Comedy_gen"] <- 1
-full_data$Comedy_gen[is.na(full_data$Comedy_gen)] <- 0
-
-full_data[grep("Crime", full_data$All_Genres),"Crime_gen"] <- 1
-full_data$Crime_gen[is.na(full_data$Crime_gen)] <- 0
-
-full_data[grep("Documentary", full_data$All_Genres),"Docu_gen"] <- 1
-full_data$Docu_gen[is.na(full_data$Docu_gen)] <- 0
-
-full_data[grep("Drama", full_data$All_Genres),"Drama_gen"] <- 1
-full_data$Drama_gen[is.na(full_data$Drama_gen)] <- 0
-
-full_data[grep("Fantasy", full_data$All_Genres),"Fantasy_gen"] <- 1
-full_data$Fantasy_gen[is.na(full_data$Fantasy_gen)] <- 0
-
-full_data[grep("Film-Noir", full_data$All_Genres),"Noir_gen"] <- 1
-full_data$Noir_gen[is.na(full_data$Noir_gen)] <- 0
-
-full_data[grep("Horror", full_data$All_Genres),"Horror_gen"] <- 1
-full_data$Horror_gen[is.na(full_data$Horror_gen)] <- 0
-
-full_data[grep("Musical", full_data$All_Genres),"Musical_gen"] <- 1
-full_data$Musical_gen[is.na(full_data$Musical_gen)] <- 0
-
-full_data[grep("Mystery", full_data$All_Genres),"Mystery_gen"] <- 1
-full_data$Mystery_gen[is.na(full_data$Mystery_gen)] <- 0
-
-full_data[grep("Romance", full_data$All_Genres),"Romance_gen"] <- 1
-full_data$Romance_gen[is.na(full_data$Romance_gen)] <- 0
-
-full_data[grep("Sci-Fi", full_data$All_Genres),"Sci-Fi_gen"] <- 1
-full_data$Sci-Figen[is.na(full_data$Sci-Fi_gen)] <- 0
-
-full_data[grep("Thriller", full_data$All_Genres),"Thriller_gen"] <- 1
-full_data$Thriller_gen[is.na(full_data$Thriller_gen)] <- 0
-
-full_data[grep("War", full_data$All_Genres),"War_gen"] <- 1
-full_data$War_gen[is.na(full_data$War_gen)] <- 0
-
-full_data[grep("Western", full_data$All_Genres),"Western_gen"] <- 1
-full_data$Western_gen[is.na(full_data$Western_gen)] <- 0
-```
-
-# Creating dummy variables for the 'Age' feature
-
-Next, we will create dummy variables for all the different age ranges in the 'All_Genres' variable:
-
-	*  1:  "Under 18"
-	* 18:  "18-24"
-	* 25:  "25-34"
-	* 35:  "35-44"
-	* 45:  "45-49"
-	* 50:  "50-55"
-	* 56:  "56+"
-	
-```{r}
-# Create dummy variables for Ages.
-
-full_data$Under_18 <- ifelse(full_data$Age == 1, 1, 0)
-full_data$R18_24 <- ifelse(full_data$Age == 18, 1, 0)
-full_data$R25_34 <- ifelse(full_data$Age == 25, 1, 0)
-full_data$R35_44 <- ifelse(full_data$Age == 35, 1, 0)
-full_data$R45_49 <- ifelse(full_data$Age == 45, 1, 0)
-full_data$R50_55 <- ifelse(full_data$Age == 50, 1, 0)
-full_data$Above55 <- ifelse(full_data$Age == 56, 1, 0)
+df <- na.omit(df)
 
 ```
 
-
-# Removing cells with missing data
-
-Now that the data set is complete, we will delete all entries with missing data.
-```{r}
-# delete all cells with incomplete data, if any.
-full_data <- na.omit(full_data)
-```
-
-We will now Save our full dataset into a csv file
-```{r}
-write.csv(full_data, file = "full_data_final.csv")
-```
-
-
-# Normalizing The Data
+This sample data contains the following variables:
 
 ```{r}
-# calculate the pre-process parameters from the dataset
-preprocessParams <- preProcess(full_data, method = c("range"))
+str(df)
 
-# summarize transform parameters
-print(preprocessParams)
-
-# Carry out normalization on the data set and call the new set 'full_data_scaled'.
-# transform the dataset using the parameters
-full_data_scaled <- predict(preprocessParams, full_data)
-
-# summarize the transformed dataset
-summary(full_data_scaled)
 ```
 
+For our exploratory analysis, we will check how Age and Gender influenced ratings across genres.
 
-#  Data Partitioning
 
-We will use a single 70/30% split to split the dataset into a training set and a test set.
+# Ratings of Action movies by Gender
 
 ```{r}
-set.seed(12345)
-trainIndex <- createDataPartition(full_data_scaled$Ratings, p = .7, list = FALSE)
-head(trainIndex)
+ggplot(df, aes(x=Action, y=Ratings )) + geom_jitter(aes(color=factor(gender))) + labs(title="Action Movie Ratings by Gender")
 
-train_data <- full_data_scaled[ trainIndex,]
-test_data  <- full_data_scaled[-trainIndex,]
 ```
+The figure suggests that generally, far more males were asked to rate Action movies than women. Also, most users will usually give an Action movie atleast a 3-star rating. However, there appears to be a nice balance of gender for each rating. Therefore, gender did not play a huge role in how users rated Action movies.    
 
-We will now Save both train and test data in separate csv files
+
+
+
+
 ```{r}
-write.csv(train_data, file = "train_data.csv")
-write.csv(test_data, file = "test_data.csv")
+
+ggplot(df, aes(x=Romance, y=Ratings )) + geom_jitter(aes(color=factor(age)))
+
+```
+Generally, most users gave ratings of atleast 3 to Romance movies, with the 18-24 and 25-34 age groups dominating this category.
+
+```{r}
+
+ggplot(df, aes(x=Romance, y=Ratings )) + geom_jitter(aes(color=factor(gender)))
+
+```
+Once again, there is a nice balance on ratings by male and female for Romance movies. So, gender did not play a role here also.
+
+```{r}
+
+ggplot(df, aes(x=factor(Ratings), y=Drama )) + geom_jitter(aes(color=age))
+
+```
+Generally, it appears that all older age groups gave higher ratings for Drama movies.
+
+```{r}
+
+ggplot(df, aes(x=gender, y=Children )) + geom_jitter(aes(color=Ratings))
+
+
+```
+From this graph, it appears that there was general consensus on movie ratings for Children's movies across genders.
+
+```{r}
+
+ggplot(df, aes(x=gender, y=Romance )) + geom_jitter(aes(color=Ratings))
+
+
 ```
 
+From this graph, there is very little difference in ratings from the different gender for Romance movies. 
+
+Generally, it appears that gender does not seem to affect movie ratings much, even for Action, Romance, Thriller and Drama genres where stark contrasts were expected. 
+
+
+
+
+# Train different models using only a single user
+
+### Generate training and test data
+```{r}
+movies = which(m[[2]]>0)
+movies = movies[movies<=3883]
+train_data = R[movies,]
+train_data$targets = m$X1[movies]
+test = R[-movies,]
+```
+### Fit a linear regression model
+```{r}
+fit = lm(targets ~. ,data = train_data)
+summary(fit)
+test$predict = predict(fit,test)
+idx = order(test$predict,decreasing = T)
+top5 = idx[1:5]
+mov_names = movie_info[top5,2]
+ratings = test$predict[top5]
+pred = data.frame(mov_names,ratings)
+```
+### View the predictions for the user from the test data
+
+```{r}
+print(pred)
+```
+
+### Modify the targets for classification.
+
+The ratings 0-5 are modified such the rating above 4 is 1 and rating below 4 is 0. This trains the classifier whether
+to predict the movie for a user or not
+
+```{r}
+train_data$targets <- ifelse(train_data$targets == 5, 1, 0)
+```
+### Training SVM model
+
+```{r}
+# Check to see if the depended packages are installed, if not install
+inst_pkgs = load_pkgs =  c("ff","ffbase","biglm", "recommenderlab", "ggplot2", "data.table", "qdapTools", "neuralnet", "caret","stringr","dplyr", "e1071")
+inst_pkgs = inst_pkgs[!(inst_pkgs %in% installed.packages()[,"Package"])]
+if(length(inst_pkgs)) install.packages(inst_pkgs)
+
+
+# Dynamically load packages
+pkgs_loaded = lapply(load_pkgs, require, character.only=T)
+
+#Read the file named movies.csv
+movies <- fread("movies_g.csv")
+
+#Discover the genres of each individual movies to be classified into
+genres <- sapply(movies$All_Genres, function(x) strsplit(x, split = "|", fixed = T))
+
+#Append a column containing the corresponding genres of each movie in the dataset
+movies$genres <-  sapply(movies$All_Genres, function(x) strsplit(x, split = "|", fixed = T))
+
+# Below series of commands generate columns corresponding to each of the unique genres identified and the values of the # cells indicate the movie row relationship with the corresponding column genre
+
+#dataset d2 contains the movie name and its genre identity represented as 1s and 0s
+d2 <- mtabulate(strsplit(str_replace_all(as.character(movies$genres), "[[:punct:]]|^c", " ")," "))
+d2$V1 = NULL
+d2$Fi = NULL
+d2$s <- NULL
+names(d2)[names(d2) == 'Sci'] <- 'SciFi'
+d2$title <- movies$Movie_Name
+d2$id <- movies$Movie_ID
+d2 <- d2[, c(21:20, 1:19)]
+
+#look at d2
+head(d2)
+
+#load users.csv file
+users <- fread("users.csv")
+str(users)
+
+
+#load ratings.csv file
+ratings <- fread("ratings.csv")
+str(ratings)
+head(ratings)
+
+# VAriable user is assigned a number corresponding to an user of interest
+user = 1
+
+# select the columns movie ID and ratings for a given user represented by the user variable (here user is one with the # value of 1 as his/her User_ID)
+movRat <- ratings %>% filter(ratings[,1]==user) %>% select(Movie_ID, Ratings)
+
+# dataframe d3 represents a table for the given user containing the movies rated with genre identity and the ratings
+d3 <- d2[d2$id %in% movRat[,"Movie_ID"],] %>% mutate(target = movRat[,"Ratings"])
+
+d3$title = NULL
+d3$id = NULL
+
+
+#create testing and training datasets
+
+trainingIndex <- createDataPartition(d3$target, p=0.9, list = F)
+
+train <- d3[trainingIndex,]
+test <- d3[-trainingIndex,]
+
+head(train)
+
+#fit linear reg model
+fit <- lm(target~., data = train)
+
+pred <- predict(fit,newdata = test)
+
+#display the predictions of ratings
+pred
+
+#display the actual ratings
+test$target
+
+fit
+
+#fit svm model
+
+fit_svm <- svm(target~., data= train)
+
+pred_svm <- predict(fit_svm, newdata=test)
+
+pred_svm
+
+test$target
+
+```
+### Train a Logistic CLassification
+```{r}
+d3$target <- ifelse(d3$target==5, 1,0)
+
+trainingIndex <- createDataPartition(d3$target, p=0.9, list = F)
+
+train <- d3[trainingIndex,]
+test <- d3[-trainingIndex,]
+
+head(train)
+
+fit2 <- glm(target~., data = train)
+
+pred <- predict(fit2, newdata = test) 
+
+pred
+
+test$target
+
+fit2
+
+#confusionMatrix(pred,test$target)
+```
+#Train Neural Network
+
+```{r}
+f <- as.formula(target ~ Action+Adventure+Animation+Children+Comedy +Crime+Documentary+Drama+Fantasy+Film+Horror+Musical+Mystery+Noir+Romance + Thriller+War+Western + SciFi)
+
+nn_fit <- neuralnet(f,data = train,hidden=c(5,3), linear.output = F)
+summary(nn_fit)
+
+plot(nn_fit, rep="best", cex=0.8)
+
+#pred_norm <- predict(nn_fit,test[-20])
+#pred_norm$net.result - test$target
+
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).

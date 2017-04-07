@@ -1,0 +1,384 @@
+---
+title: "Recommended Systems Data Preparation"
+author: "Somua-Gyimah, Godfred   | Ballamudi, Bharath Chowdary    | Gottapu, Ram Deepak "
+date: "March 5, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#                                       A MOVIE RECOMMENDER SYSTEM
+
+## Introduction:
+Recommender Systems (RS) keep growing in popularity in the world of machine learning and predictive modeling. It is ubiquitous and is used in virtually every industry. Due to its direct impact on the bottom line, RS has been embraced by most of the major corporations in the world.  Wal-Mart and other supermarkets use it to predict the purchase activities of their customers. This allows for a more convenient shopping experience, which also translates into more shopping on the consumer's part and consequently more revenue to the business. Online stores such as Amazon, Ebay and Etsy use RS to recommend products to buyers. Pandora and Spotify use it to recommend music from specific genres to listeners based on their listening history. LinkedIn, a professional networking site, uses RS to recommend individuals, recruiters, and advertisers to one other. LinkedIn reported that about 50% of the total job applications and job views by individuals were as a result of their recommendation model [1]. The other business areas which have adopted the RS approach include social networking sites (Facebook, Instagram etc.), search engines, restaurants, insurance companies, online dating among countless others. 
+
+Currently, one major area where RS benefits the vast majority of Americans is in movie recommendations. Netflix, an entertainment company, employs over 300 people, spending a staggering $150 million annually, just to generate movie recommendations for viewers based on their previous preferences and movie-watching history [2]. For a company like Netflix, accurate movie recommendations are critical since the company gets most of its revenue from customer subscriptions. The company uses a "one free month trial" policy to reel in most of their new customers.  During the registration, they ask each new customer to rate atleast five movies from different genres, which provides them with customer-specific data. One major challenge is that at any given time, there are millions of movies for a customer to choose from. Therefore, the movie selection process can be a very tedious exercise for the average consumer. Often, customers will cancel their subscription after a few failed attempts at finding the right movie to watch. Therefore, to prevent loss of revenue through subscription cancellations, Netflix helps its customers to locate movies they would like to watch using their RS. Hence, there is a direct correlation between the accuracy of their RS and their income generation. It therefore came as no surprise when in 2008, Netflix organized a competition with a million dollar prize tag for the winner who will improve their existing RS by atleast 10%. 
+
+In this project, we will be building our own recommender system, similar to the one used by Netflix. Some of the business questions which we will seek to answer include the following:
+
+(1)	Given a user's history or movie preferences, which movie is the user likely to be interested in?
+
+(2)	Should we adopt a binary class approach (recommend or not recommend) or a multi-class approach (ratings - 1, 2, 3, 4 and 5)
+
+(3)	If there is more than one movie to recommend, what ranking system should be used to determine the order of the movie list? 
+       
+## Data Source and Collection:
+The data which will be used in building our recommendation engine was obtained from MovieLens, an online movie recommendation service. The dataset describes the 5-star rating (classification) and free-text tagging activity from the website. It contains over 1 million (1,000,209) ratings from 3,900 movies. The dataset was developed by collecting movie preference information from the 6,040 MovieLens users who joined in 2000. Each user rated atleast 20 different movies. Each user was given a number (User_id) to distinguish the different users. The user ids were anonymized and so no demographic or personal information was collected. The data comes in 3 different files namely: movies.csv, ratings.csv and users.csv. The major features of the data set include: userId, movieId, age, movie_genres and movie_rating. The data set is a 25MB file and is publicly available for download at https://grouplens.org/datasets/movielens/1m/.
+
+
+```{r}
+# Clean the environment
+rm(list = ls())
+
+```
+
+```{r}
+# Load library
+library(caret)
+```
+
+## Data Wrangling & Cleansing:
+
+There are three different data files which have to be combined to produce the data set for model training and evaluation. 
+
+These are : (1) users.csv - which contains the age, gender and occupation information about each user
+            (2) movies.csv - which contains the title and genre information about each movie
+            (3) ratings.csv - which contains the movie ratings by all 6,040 users
+
+```{r}
+# Read the users.csv data file; call it user_info
+user_info <- read.csv("users.csv")
+```
+'user_info' has the following structure:
+```{r}
+str(user_info)
+```
+
+```{r}
+# We will check for cells with missing values;
+user_info[!complete.cases(user_info),]
+```
+There are no missing values with the users.csv data. 
+
+```{r}
+View(user_info)
+```
+
+So we will move on to the movies.csv data file and repeat the same thing.
+
+
+```{r}
+# Read the movies.csv data file; call it movie_info
+movie_info <- read.csv("movies.csv")
+```
+'movie_info' has the following structure:
+```{r}
+str(movie_info)
+```
+
+Somehow, the 'All_Genres' column shows 301 levels so let's investigate it more closely.
+```{r}
+head(movie_info$All_Genres)
+```
+Okay, so it appears the All_Genres variable combines all the genres for one movie. Another look at the 'readme' file indicates that 'All_Genres' has the following 18 different genres: 
+
+                	* Action
+                	* Adventure
+                	* Animation
+                	* Children's
+                	* Comedy
+                	* Crime
+                	* Documentary
+                	* Drama
+                	* Fantasy
+                	* Film-Noir
+                	* Horror
+                	* Musical
+                	* Mystery
+                	* Romance
+                	* Sci-Fi
+                	* Thriller
+                	* War
+                	* Western
+
+We will create dummy variables from these later. For now, we will look at the ratings.csv data file.
+```{r}
+# Read the ratings.csv data file; call it rating_info
+rating_info <- read.csv("ratings.csv")
+```
+'rating_info' has the following structure:
+```{r}
+str(rating_info)
+```
+
+We will now combine all 3 data frames in a 4th data frame.
+```{r}
+# Create a new data frame from ratings.csv; we will update with info from movie_info and user_info later. For now, copy all data from rating_info, except Timestamp.
+
+df <- rating_info[,-4]
+
+```
+
+```{r}
+# Take a look at the new dataset
+head(df)
+tail(df)
+```
+
+We will now update our combined dataframe, df, with user information from 'user_info'.  
+```{r}
+# Take a look at the data in user_info
+head(user_info)
+tail(user_info)
+```
+We will now create a dummy variable for the Gender variable such that:
+F = 0 and M = 1
+```{r}
+user_info$Gender <- ifelse(user_info$Gender == 'M', 1, 0)
+```
+
+```{r}
+# Take a look at the new variable, New_Gender
+head(user_info)
+tail(user_info)
+```
+
+For our model, user location is irrelevant so we will drop the 'Zip Code' variable and use only Gender and Age. We will also drop the 'Occupation' variable because it is not comprehensive enough.  
+
+```{r}
+user_info$Occupation = NULL
+user_info$Zip_Code = NULL
+# If the user ids in 'df' and 'user_info' match, create or update the values in df$Age, df$Gender and df$Occupation.
+for (i in 1:nrow(df)){
+  for (j in 1:nrow(user_info)){
+    if(df[i,1]==user_info[j,1]){
+      next
+    }
+      df$Age[i]        <- user_info$Age[j]
+      df$Gender[i]     <- user_info$New_Gender[j]
+  }
+  
+}
+  
+```
+
+
+
+
+```{r}
+# Take a look at the new variables
+head(df)
+tail(df)
+```
+
+```{r}
+# We will check for cells with missing values;
+df[!complete.cases(df),]
+```
+
+
+```{r}
+# Take a look at the data in user_info
+head(movie_info)
+tail(movie_info)
+```
+
+Next, we will update df with each movie's genre information.
+```{r}
+# If the movie ids in 'df' and 'movie_info' match, create or update the values in df$All_Genres.
+for (i in 1:nrow(df)){
+  for (k in 1:nrow(movie_info)){
+    if(df[i,2]==movie_info[k,1]){
+      next
+    }
+      df$All_Genres[i]        <- movie_info$All_Genres[k]
+
+  }
+  
+}
+  
+```
+
+
+We will now move the target variable (Rating) to the first column for convenience. 
+
+```{r}
+library(dplyr)
+full_data <- df %>%
+  select(Ratings, User_ID, Movie_ID, Age, All_Genres)
+```
+
+Now, we will view our new data set
+```{r}
+head(full_data)
+tail(full_data)
+```
+
+We will now Save our full dataset into a csv file
+```{r}
+write.csv(full_data, file = "full_data.csv")
+```
+
+
+# Creating dummy variables for the 'All_Genres' feature
+
+Next, we will create dummy variables for all the following different genres in the 'All_Genres' variable:
+
+                	* Action
+                	* Adventure
+                	* Animation
+                	* Children's
+                	* Comedy
+                	* Crime
+                	* Documentary
+                	* Drama
+                	* Fantasy
+                	* Film-Noir
+                	* Horror
+                	* Musical
+                	* Mystery
+                	* Romance
+                	* Sci-Fi
+                	* Thriller
+                	* War
+                	* Western
+
+
+```{r}
+# Assign 1 to all instances where a particular genre shows in the 'All_Genres'
+full_data[grep("Action", full_data$All_Genres),"Action_gen"] <- 1
+# Replace missing values with 0
+full_data$Action_gen[is.na(full_data$Action_gen)] <- 0
+
+# Repeat for all other genres
+full_data[grep("Adventure", full_data$All_Genres),"Adventure_gen"] <- 1
+full_data$Adventure_gen[is.na(full_data$Adventure_gen)] <- 0
+
+full_data[grep("Animation", full_data$All_Genres),"Animation_gen"] <- 1
+full_data$Animation[is.na(full_data$Animation)] <- 0
+
+full_data[grep("Children's", full_data$All_Genres),"Children_gen"] <- 1
+full_data$Children_gen[is.na(full_data$Children_gen)] <- 0
+
+full_data[grep("Comedy", full_data$All_Genres),"Comedy_gen"] <- 1
+full_data$Comedy_gen[is.na(full_data$Comedy_gen)] <- 0
+
+full_data[grep("Crime", full_data$All_Genres),"Crime_gen"] <- 1
+full_data$Crime_gen[is.na(full_data$Crime_gen)] <- 0
+
+full_data[grep("Documentary", full_data$All_Genres),"Docu_gen"] <- 1
+full_data$Docu_gen[is.na(full_data$Docu_gen)] <- 0
+
+full_data[grep("Drama", full_data$All_Genres),"Drama_gen"] <- 1
+full_data$Drama_gen[is.na(full_data$Drama_gen)] <- 0
+
+full_data[grep("Fantasy", full_data$All_Genres),"Fantasy_gen"] <- 1
+full_data$Fantasy_gen[is.na(full_data$Fantasy_gen)] <- 0
+
+full_data[grep("Film-Noir", full_data$All_Genres),"Noir_gen"] <- 1
+full_data$Noir_gen[is.na(full_data$Noir_gen)] <- 0
+
+full_data[grep("Horror", full_data$All_Genres),"Horror_gen"] <- 1
+full_data$Horror_gen[is.na(full_data$Horror_gen)] <- 0
+
+full_data[grep("Musical", full_data$All_Genres),"Musical_gen"] <- 1
+full_data$Musical_gen[is.na(full_data$Musical_gen)] <- 0
+
+full_data[grep("Mystery", full_data$All_Genres),"Mystery_gen"] <- 1
+full_data$Mystery_gen[is.na(full_data$Mystery_gen)] <- 0
+
+full_data[grep("Romance", full_data$All_Genres),"Romance_gen"] <- 1
+full_data$Romance_gen[is.na(full_data$Romance_gen)] <- 0
+
+full_data[grep("Sci-Fi", full_data$All_Genres),"Sci-Fi_gen"] <- 1
+full_data$Sci-Figen[is.na(full_data$Sci-Fi_gen)] <- 0
+
+full_data[grep("Thriller", full_data$All_Genres),"Thriller_gen"] <- 1
+full_data$Thriller_gen[is.na(full_data$Thriller_gen)] <- 0
+
+full_data[grep("War", full_data$All_Genres),"War_gen"] <- 1
+full_data$War_gen[is.na(full_data$War_gen)] <- 0
+
+full_data[grep("Western", full_data$All_Genres),"Western_gen"] <- 1
+full_data$Western_gen[is.na(full_data$Western_gen)] <- 0
+```
+
+# Creating dummy variables for the 'Age' feature
+
+Next, we will create dummy variables for all the different age ranges in the 'All_Genres' variable:
+
+	*  1:  "Under 18"
+	* 18:  "18-24"
+	* 25:  "25-34"
+	* 35:  "35-44"
+	* 45:  "45-49"
+	* 50:  "50-55"
+	* 56:  "56+"
+	
+```{r}
+# Create dummy variables for Ages.
+
+full_data$Under_18 <- ifelse(full_data$Age == 1, 1, 0)
+full_data$R18_24 <- ifelse(full_data$Age == 18, 1, 0)
+full_data$R25_34 <- ifelse(full_data$Age == 25, 1, 0)
+full_data$R35_44 <- ifelse(full_data$Age == 35, 1, 0)
+full_data$R45_49 <- ifelse(full_data$Age == 45, 1, 0)
+full_data$R50_55 <- ifelse(full_data$Age == 50, 1, 0)
+full_data$Above55 <- ifelse(full_data$Age == 56, 1, 0)
+
+```
+
+
+# Removing cells with missing data
+
+Now that the data set is complete, we will delete all entries with missing data.
+```{r}
+# delete all cells with incomplete data, if any.
+full_data <- na.omit(full_data)
+```
+
+We will now Save our full dataset into a csv file
+```{r}
+write.csv(full_data, file = "full_data_final.csv")
+```
+
+
+# Normalizing The Data
+
+```{r}
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(full_data, method = c("range"))
+
+# summarize transform parameters
+print(preprocessParams)
+
+# Carry out normalization on the data set and call the new set 'full_data_scaled'.
+# transform the dataset using the parameters
+full_data_scaled <- predict(preprocessParams, full_data)
+
+# summarize the transformed dataset
+summary(full_data_scaled)
+```
+
+
+#  Data Partitioning
+
+We will use a single 70/30% split to split the dataset into a training set and a test set.
+
+```{r}
+set.seed(12345)
+trainIndex <- createDataPartition(full_data_scaled$Ratings, p = .7, list = FALSE)
+head(trainIndex)
+
+train_data <- full_data_scaled[ trainIndex,]
+test_data  <- full_data_scaled[-trainIndex,]
+```
+
+We will now Save both train and test data in separate csv files
+```{r}
+write.csv(train_data, file = "train_data.csv")
+write.csv(test_data, file = "test_data.csv")
+```
+
